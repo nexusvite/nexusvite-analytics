@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,13 +62,91 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 export default function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState("30d");
   const [isConnected, setIsConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const disconnect = async () => {
+    // Notify platform that app is disconnected
+    try {
+      await fetch('http://localhost:3000/api/apps/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          appId: 'com.nexusvite.analytics',
+          userId: 'user_1', // In production, get from token
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to notify platform of disconnect:', error);
+    }
+
+    // Clear cookies
+    document.cookie = 'auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    setIsConnected(false);
+  };
 
   // Check if app is connected to NexusVite platform
+  useEffect(() => {
+    // Check URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('connected') === 'true') {
+      setIsConnected(true);
+      setLoading(false);
+      // Clean up URL
+      window.history.replaceState({}, '', '/');
+      return;
+    }
+
+    // Check for auth_status cookie (client-readable)
+    const cookies = document.cookie.split(';');
+    const hasAuthStatus = cookies.some(cookie =>
+      cookie.trim().startsWith('auth_status=connected')
+    );
+
+    setIsConnected(hasAuthStatus);
+    setLoading(false);
+  }, []);
+
+  // Periodically check if session was revoked (only when connected)
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/session/status');
+        const data = await response.json();
+
+        if (data.revoked) {
+          // Session was revoked by platform uninstall
+          setIsConnected(false);
+          // Cookies were already cleared by the API
+          window.location.reload();
+        }
+      } catch (error) {
+        // Ignore errors, just for checking revocation
+      }
+    };
+
+    // Check every 5 seconds
+    const interval = setInterval(checkSession, 5000);
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
   const connectToPlatform = () => {
-    // In production, this would redirect to OAuth flow
+    // Redirect to OAuth flow
     const authUrl = `/api/auth/connect`;
     window.location.href = authUrl;
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
@@ -108,6 +186,7 @@ export default function AnalyticsDashboard() {
               <span className="ml-2 text-xl font-bold">Analytics Dashboard</span>
             </div>
             <div className="flex items-center gap-4">
+              <span className="text-sm text-green-600">✓ Connected to NexusVite</span>
               <Button variant="outline" size="sm">
                 <Calendar className="h-4 w-4 mr-2" />
                 {dateRange === "30d" ? "Last 30 days" : "Custom"}
@@ -119,6 +198,9 @@ export default function AnalyticsDashboard() {
               <Button size="sm">
                 <Download className="h-4 w-4 mr-2" />
                 Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={disconnect}>
+                Disconnect
               </Button>
             </div>
           </div>

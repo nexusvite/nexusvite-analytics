@@ -1,0 +1,77 @@
+{
+  "id": "com.nexusvite.analytics",
+  "name": "Analytics Dashboard",
+  "version": "1.0.0",
+  "description": "Advanced analytics and reporting for NexusVite platform",
+  "vendor": {
+    "name": "NexusVite",
+    "email": "support@nexusvite.com",
+    "url": "https://nexusvite.com"
+  },
+  "icon": "/icon.png",
+  "homepage": "https://analytics.nexusvite.com",
+  "category": "analytics",
+  "tags": ["analytics", "reports", "dashboard", "metrics"],
+  "authentication": {
+    "type": "oauth2",
+    "scopes": [
+      "read:users",
+      "read:organizations",
+      "read:apps",
+      "read:transactions"
+    ],
+    "callback_url": "/api/auth/callback"
+  },
+  "permissions": {
+    "data": {
+      "read": ["users", "organizations", "apps", "transactions"],
+      "write": []
+    },
+    "api": {
+      "endpoints": [
+        "/api/v1/analytics/*",
+        "/api/v1/reports/*"
+      ]
+    }
+  },
+  "webhooks": {
+    "events": [
+      "app.installed",
+      "app.uninstalled",
+      "user.created",
+      "transaction.completed"
+    ],
+    "endpoint": "/api/webhooks"
+  },
+  "requirements": {
+    "platform_version": ">=1.0.0",
+    "node_version": ">=20.0.0"
+  },
+  "pricing": {
+    "model": "freemium",
+    "plans": [
+      {
+        "id": "free",
+        "name": "Free",
+        "price": 0,
+        "features": [
+          "Basic analytics",
+          "7-day data retention",
+          "Up to 1,000 events/month"
+        ]
+      },
+      {
+        "id": "pro",
+        "name": "Pro",
+        "price": 29,
+        "features": [
+          "Advanced analytics",
+          "90-day data retention",
+          "Unlimited events",
+          "Custom reports",
+          "API access"
+        ]
+      }
+    ]
+  }
+}

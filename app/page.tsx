@@ -29,6 +29,7 @@ import {
   Download,
   Calendar,
   Filter,
+  Settings,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 
@@ -63,6 +64,8 @@ export default function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState("30d");
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [embedMode, setEmbedMode] = useState(false);
 
   const disconnect = async () => {
     // Notify platform that app is disconnected
@@ -89,6 +92,14 @@ export default function AnalyticsDashboard() {
 
   // Check if app is connected to NexusVite platform
   useEffect(() => {
+    // Check if running in embedded mode (iframe)
+    const inIframe = window !== window.parent;
+    setIsEmbedded(inIframe);
+
+    // Load embed mode setting
+    const storedEmbedMode = localStorage.getItem("embed_mode");
+    setEmbedMode(storedEmbedMode === "true");
+
     // Check URL parameters first
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('connected') === 'true') {
@@ -135,9 +146,8 @@ export default function AnalyticsDashboard() {
   }, [isConnected]);
 
   const connectToPlatform = () => {
-    // Redirect to OAuth flow
-    const authUrl = `/api/auth/connect`;
-    window.location.href = authUrl;
+    // Redirect to install page
+    window.location.href = '/install';
   };
 
   if (loading) {
@@ -153,14 +163,14 @@ export default function AnalyticsDashboard() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Connect to NexusVite Platform</CardTitle>
+            <CardTitle>Analytics Dashboard Not Installed</CardTitle>
             <CardDescription>
-              Connect your Analytics Dashboard to the NexusVite platform to start tracking your data.
+              Install the Analytics Dashboard app on your NexusVite platform to start tracking your data.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={connectToPlatform} className="w-full">
-              Connect with NexusVite
+              Install on NexusVite Platform
             </Button>
             <Button
               variant="outline"
@@ -169,6 +179,9 @@ export default function AnalyticsDashboard() {
             >
               Continue with Demo Data
             </Button>
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              Enter your platform URL to install this app, similar to how Shopify apps are installed.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -177,35 +190,43 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Activity className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold">Analytics Dashboard</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-green-600">✓ Connected to NexusVite</span>
-              <Button variant="outline" size="sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                {dateRange === "30d" ? "Last 30 days" : "Custom"}
-              </Button>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-              <Button size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              <Button variant="outline" size="sm" onClick={disconnect}>
-                Disconnect
-              </Button>
+      {/* Header - Hide if embedded */}
+      {!isEmbedded && (
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex h-16 items-center justify-between">
+              <div className="flex items-center">
+                <Activity className="h-8 w-8 text-blue-600" />
+                <span className="ml-2 text-xl font-bold">Analytics Dashboard</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-green-600">✓ Connected to NexusVite</span>
+                <Button variant="outline" size="sm">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {dateRange === "30d" ? "Last 30 days" : "Custom"}
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+                <Button size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <a href="/settings">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" onClick={disconnect}>
+                  Disconnect
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -297,7 +318,7 @@ export default function AnalyticsDashboard() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={(props: { name?: string; percent?: unknown }) => `${props.name || ''} ${((props.percent as number) * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"

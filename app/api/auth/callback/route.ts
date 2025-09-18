@@ -6,6 +6,14 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   const error = searchParams.get("error");
+  // Get params from URL or cookies
+  const installationId = searchParams.get("installation_id") ||
+                         request.cookies.get("pending_installation_id")?.value;
+  const platformUrl = searchParams.get("platform_url") ||
+                     request.cookies.get("pending_platform_url")?.value ||
+                     "http://localhost:3000";
+  const embedMode = searchParams.get("embed_mode") === "true" ||
+                   request.cookies.get("pending_embed_mode")?.value === "true";
 
   // Handle OAuth errors
   if (error) {
@@ -49,7 +57,40 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24, // 24 hours
     });
 
+    // Store installation and embed settings
+    if (installationId) {
+      response.cookies.set("installation_id", installationId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+    }
+
+    response.cookies.set("platform_url", platformUrl, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    response.cookies.set("embed_mode", String(embedMode), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    // Clean up temporary cookies
     response.cookies.delete("oauth_state");
+    response.cookies.delete("pending_installation_id");
+    response.cookies.delete("pending_platform_url");
+    response.cookies.delete("pending_embed_mode");
+
+    // If in embed mode, redirect to platform instead
+    if (embedMode && installationId) {
+      return NextResponse.redirect(`${platformUrl}/dashboard/apps/${installationId}/view`);
+    }
 
     return response;
   } catch (error) {

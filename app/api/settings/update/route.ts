@@ -29,10 +29,30 @@ export async function POST(req: NextRequest) {
     //   }),
     // });
 
-    return NextResponse.json({
+    // Create response with cookies
+    const response = NextResponse.json({
       success: true,
-      settings: { embedMode }
+      settings: { embedMode, platformUrl }
     });
+
+    // Set cookies for middleware to use
+    response.cookies.set('embed_mode', String(embedMode), {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30 // 30 days
+    });
+
+    if (platformUrl) {
+      response.cookies.set('platform_url', platformUrl, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30 // 30 days
+      });
+    }
+
+    return response;
   } catch (error) {
     console.error('Settings update error:', error);
     return NextResponse.json(

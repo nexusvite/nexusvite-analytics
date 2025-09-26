@@ -102,11 +102,21 @@ export default function AnalyticsDashboard() {
 
     // Check URL parameters first
     const urlParams = new URLSearchParams(window.location.search);
+
+    // If we're in an iframe with embed_mode parameter, trust it
+    if (inIframe && urlParams.get('embed_mode') === 'true' && urlParams.get('session_token')) {
+      setIsConnected(true);
+      setLoading(false);
+      return;
+    }
+
     if (urlParams.get('connected') === 'true') {
       setIsConnected(true);
       setLoading(false);
-      // Clean up URL
-      window.history.replaceState({}, '', '/');
+      // Clean up URL only if not in iframe
+      if (!inIframe) {
+        window.history.replaceState({}, '', '/');
+      }
       return;
     }
 
@@ -120,9 +130,9 @@ export default function AnalyticsDashboard() {
     setLoading(false);
   }, []);
 
-  // Periodically check if session was revoked (only when connected)
+  // Periodically check if session was revoked (only when connected and NOT in iframe)
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected || isEmbedded) return;
 
     const checkSession = async () => {
       try {
@@ -130,8 +140,14 @@ export default function AnalyticsDashboard() {
         const data = await response.json();
 
         if (data.revoked) {
-          // Session was revoked by platform uninstall
+          // Session was revoked by platform uninstall or logout
           setIsConnected(false);
+
+          // Set flag to auto-reconnect on next visit if platform URL is known
+          if (localStorage.getItem("platform_url")) {
+            localStorage.setItem("auto_reconnect", "true");
+          }
+
           // Cookies were already cleared by the API
           window.location.reload();
         }
@@ -140,10 +156,10 @@ export default function AnalyticsDashboard() {
       }
     };
 
-    // Check every 5 seconds
+    // Check every 5 seconds (only in standalone mode)
     const interval = setInterval(checkSession, 5000);
     return () => clearInterval(interval);
-  }, [isConnected]);
+  }, [isConnected, isEmbedded]);
 
   const connectToPlatform = () => {
     // Redirect to install page

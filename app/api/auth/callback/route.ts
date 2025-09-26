@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
                      "http://localhost:3000";
   const embedMode = searchParams.get("embed_mode") === "true" ||
                    request.cookies.get("pending_embed_mode")?.value === "true";
+  const sessionToken = searchParams.get("session_token") ||
+                      request.cookies.get("pending_session_token")?.value;
 
   // Handle OAuth errors
   if (error) {
@@ -33,10 +35,39 @@ export async function GET(request: NextRequest) {
   try {
     console.log("Exchanging code for tokens:", code);
 
-    // Exchange code for tokens
+    // Exchange code for tokens first
     const session = await nexusViteClient.exchangeCodeForTokens(code);
-
     console.log("Received session:", session);
+
+    // Now verify the session with the platform using the new access token
+    if (platformUrl) {
+      try {
+        const tokenToVerify = session.accessToken || sessionToken;
+
+        if (tokenToVerify) {
+          const verifyResponse = await fetch(`${platformUrl}/api/apps/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              appId: 'com.nexusvite.analytics',
+              accessToken: tokenToVerify
+            })
+          });
+
+          if (!verifyResponse.ok) {
+            const errorData = await verifyResponse.json();
+            console.error("Session verification failed:", errorData);
+            // Don't throw error here, continue with the flow
+          } else {
+            const verifyData = await verifyResponse.json();
+            console.log("Session verified for user:", verifyData.userId);
+          }
+        }
+      } catch (verifyError) {
+        console.error("Session verification error:", verifyError);
+        // Don't throw error here, continue with the flow
+      }
+    }
 
     // Store session in cookies (make auth_status readable by client)
     const response = NextResponse.redirect(new URL("/?connected=true", origin));
@@ -86,6 +117,7 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("pending_installation_id");
     response.cookies.delete("pending_platform_url");
     response.cookies.delete("pending_embed_mode");
+    response.cookies.delete("pending_session_token");
 
     // If in embed mode, redirect to platform instead
     if (embedMode && installationId) {
@@ -95,14 +127,11 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("OAuth callback error details:", error);
-    // For demo, just redirect to home with connected status
-    const response = NextResponse.redirect(new URL("/?connected=true", origin));
-    response.cookies.set("auth_status", "connected", {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24,
-    });
-    return response;
+    // Do NOT set auth_status as connected on error
+    // Redirect to error page instead
+    const errorMessage = error instanceof Error ? error.message : "Authentication failed";
+    return NextResponse.redirect(
+      new URL(`/install?error=${encodeURIComponent(errorMessage)}`, origin)
+    );
   }
 }

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const installationId = searchParams.get("installation_id");
   const platformUrl = searchParams.get("platform_url");
   const embedMode = searchParams.get("embed_mode");
-  const userId = searchParams.get("user_id");
+  const sessionToken = searchParams.get("session_token");
 
   // Generate OAuth authorization URL and redirect
   const state = Math.random().toString(36).substring(7);
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (installationId) callbackUrl.searchParams.set("installation_id", installationId);
   if (platformUrl) callbackUrl.searchParams.set("platform_url", platformUrl);
   if (embedMode) callbackUrl.searchParams.set("embed_mode", embedMode);
-  if (userId) callbackUrl.searchParams.set("user_id", userId);
+  if (sessionToken) callbackUrl.searchParams.set("session_token", sessionToken);
 
   url.searchParams.set("redirect_uri", callbackUrl.toString());
 
@@ -54,6 +54,15 @@ export async function GET(request: NextRequest) {
 
   if (embedMode) {
     response.cookies.set("pending_embed_mode", embedMode, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 10,
+    });
+  }
+
+  if (sessionToken) {
+    response.cookies.set("pending_session_token", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
